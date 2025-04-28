@@ -285,78 +285,46 @@ document.addEventListener('DOMContentLoaded', function () {
             recordingIndicator.style.display = 'flex';
         };
 
-        // Enhance the transcript display with better formatting
         recognition.onresult = function (event) {
             let interimTranscript = '';
             let finalTranscript = '';
-            let hasContent = false;
+            let currentTranscript = '';
 
-            // Create a set of already-processed final transcripts
+            // Process all results
             for (let i = event.resultIndex; i < event.results.length; ++i) {
-                const transcript = event.results[i][0].transcript.trim();
-
-                // Skip empty or very short transcripts (likely background noise)
-                if (transcript.length <= 2) continue;
-
-                hasContent = true;
-
+                currentTranscript = event.results[i][0].transcript;
+                
                 if (event.results[i].isFinal) {
-                    // Check if this transcript has been processed before
-                    if (!previousTranscriptions.has(transcript)) {
-                        finalTranscript += transcript + ' ';
-                        previousTranscriptions.add(transcript);
+                    // Only store final transcripts but don't display them yet
+                    if (!previousTranscriptions.has(currentTranscript)) {
+                        finalTranscript += currentTranscript + ' ';
+                        previousTranscriptions.add(currentTranscript);
                     }
                 } else {
-                    interimTranscript += transcript;
+                    // Accumulate interim results
+                    interimTranscript = currentTranscript;
                 }
             }
 
-            // Only update UI if there's actual content
-            if (hasContent && finalTranscript) {
-                const finalElement = document.createElement('div');
-                finalElement.className = 'transcription-final';
-                // Add data attribute for the current session
-                finalElement.setAttribute('data-session', recognitionStartTime.toString());
-
-                // Add timestamp for better separation between transcriptions
-                const timestamp = document.createElement('div');
-                timestamp.className = 'transcription-timestamp';
-                timestamp.textContent = new Date().toLocaleTimeString();
-
-                const content = document.createElement('div');
-                content.className = 'transcription-content';
-                content.textContent = finalTranscript;
-
-                finalElement.appendChild(timestamp);
-                finalElement.appendChild(content);
-
-                // Insert at the beginning (top) instead of appending at the end
-                if (transcriptionText.firstChild) {
-                    transcriptionText.insertBefore(finalElement, transcriptionText.firstChild);
-                } else {
-                    transcriptionText.appendChild(finalElement);
-                }
-
-                // Auto-scroll to the top to show the latest transcription
-                transcriptionText.scrollTop = 0;
+            // Always keep the interim element visible while recording
+            let interimElement = transcriptionText.querySelector('.transcription-interim');
+            if (!interimElement) {
+                interimElement = document.createElement('div');
+                interimElement.className = 'transcription-interim';
+                transcriptionText.insertBefore(interimElement, transcriptionText.firstChild);
             }
 
-            // Update the UI with interim transcripts - always at the top
-            // Only show interim transcripts if they contain something meaningful
-            if (hasContent && interimTranscript && interimTranscript.trim().length > 2) {
-                let interimElement = transcriptionText.querySelector('.transcription-interim');
-                if (!interimElement) {
-                    interimElement = document.createElement('div');
-                    interimElement.className = 'transcription-interim';
-                    transcriptionText.insertBefore(interimElement, transcriptionText.firstChild);
-                } else {
-                    // Move the existing interim element to the top
-                    transcriptionText.insertBefore(interimElement, transcriptionText.firstChild);
-                }
+            // Update interim element with current transcription or placeholder
+            if (isRecording) {
+                // Show either the current interim transcript or "Listening..."
+                interimElement.textContent = interimTranscript.trim() || 'Listening...';
+                interimElement.style.display = 'block'; // Always keep it visible
+            }
 
-                interimElement.textContent = interimTranscript;
-                // Keep scroll at the top
-                transcriptionText.scrollTop = 0;
+            // Store final transcript for later when recording stops
+            if (finalTranscript) {
+                sessionStorage.setItem('pendingTranscript', 
+                    (sessionStorage.getItem('pendingTranscript') || '') + finalTranscript);
             }
         };
 
@@ -994,8 +962,39 @@ document.addEventListener('DOMContentLoaded', function () {
     function stopRecording() {
         if (recognition) {
             recognition.stop();
-            isRecording = false; // Explicitly set to false to prevent auto-restart
-            console.log("Recognition stopped");
+            isRecording = false;
+            
+            // Get all pending transcripts
+            const pendingTranscript = sessionStorage.getItem('pendingTranscript');
+            if (pendingTranscript) {
+                // Create final transcription element
+                const finalElement = document.createElement('div');
+                finalElement.className = 'transcription-final';
+                finalElement.setAttribute('data-session', recognitionStartTime.toString());
+
+                const timestamp = document.createElement('div');
+                timestamp.className = 'transcription-timestamp';
+                timestamp.textContent = new Date().toLocaleTimeString();
+
+                const content = document.createElement('div');
+                content.className = 'transcription-content';
+                content.textContent = pendingTranscript.trim();
+
+                finalElement.appendChild(timestamp);
+                finalElement.appendChild(content);
+
+                // Remove interim element
+                const interimElement = transcriptionText.querySelector('.transcription-interim');
+                if (interimElement) {
+                    interimElement.remove();
+                }
+
+                // Add the final transcription at the top
+                transcriptionText.insertBefore(finalElement, transcriptionText.firstChild);
+                
+                // Clear pending transcripts
+                sessionStorage.removeItem('pendingTranscript');
+            }
         }
     }
 
