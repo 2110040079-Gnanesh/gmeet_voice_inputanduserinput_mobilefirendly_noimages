@@ -1,0 +1,270 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Voice-to-Text Transcription App</title>
+    <link rel="stylesheet" href="styles.css">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/highlight.js@11.7.0/styles/vs2015.min.css">
+    <script src="https://unpkg.com/marked@4.3.0/marked.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/highlight.js@11.7.0/lib/highlight.min.js"></script>
+    <script src="https://js.puter.com/v2/"></script>
+</head>
+
+<body>
+    <!-- Mode Selection Overlay -->
+    <div id="modeSelection" class="mode-selection-overlay" style="display: none;">
+        <div class="mode-selection-container">
+            <h2>Choose Your Mode</h2>
+            <div class="mode-buttons">
+                <div id="standardModeBtn" class="mode-btn">
+                    <i class="fas fa-microphone fa-3x"></i>
+                    <span>Standard Mode</span>
+                    <p>Transcribe your voice and get AI feedback</p>
+                </div>
+                <div id="meetingModeBtn" class="mode-btn">
+                    <i class="fas fa-users fa-3x"></i>
+                    <span>Meeting Assistant</span>
+                    <p>Record meetings and get real-time summaries</p>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Top Bar - Only visible in meeting mode -->
+    <div class="top-bar" id="top-bar">
+        <div class="app-title">
+            <i class="fas fa-microphone"></i>
+            <h1>Voice-to-Text Transcription App</h1>
+        </div>
+        <div class="mode-indicator">
+            <span id="current-mode">Standard Mode</span>
+            <button id="switchModeButton" class="btn small-btn">Switch Mode</button>
+        </div>
+        <div class="status-bar">
+            <span class="status" id="status-message">Ready</span>
+        </div>
+    </div>
+
+    <!-- Controls -->
+    <div class="controls" id="controls">
+        <div class="square-controls-container">
+            <div class="square-button-wrapper">
+                <button id="start-btn" class="btn primary square-btn">
+                    <i class="fas fa-play"></i>
+                    <span class="square-btn-label">Start</span>
+                </button>
+            </div>
+            <div class="square-button-wrapper">
+                <button id="clear-btn" class="btn secondary square-btn">
+                    <i class="fas fa-trash"></i>
+                    <span class="square-btn-label">Clear</span>
+                </button>
+            </div>
+            <div class="square-button-wrapper">
+                <button id="scan-btn" class="btn info square-btn">
+                    <i class="fas fa-camera"></i>
+                    <span class="square-btn-label">Scan</span>
+                </button>
+            </div>
+        </div>
+
+        <!-- Additional buttons only visible in meeting mode -->
+        <div class="standard-buttons">
+            <button id="screen-share-btn" class="btn secondary meeting-only-btn">
+                <i class="fas fa-desktop"></i> Share Screen
+            </button>
+            <button id="helpButton" class="btn secondary meeting-only-btn">
+                <i class="fas fa-question-circle"></i> Help
+            </button>
+        </div>
+
+        <div class="recording-indicator" id="recording-indicator">
+            <div class="recording-dot" id="recording-dot"></div>
+            <span>Recording...</span>
+        </div>
+    </div>
+
+    <!-- Camera Modal -->
+    <div id="camera-modal" class="modal">
+        <div class="modal-content camera-modal-content">
+            <span class="close-button" id="close-camera">&times;</span>
+            <h2>Take a Photo</h2>
+            <div class="camera-container">
+                <video id="camera-preview" autoplay playsinline></video>
+                <canvas id="camera-capture" style="display:none;"></canvas>
+                <div id="captured-image-container" style="display:none;">
+                    <img id="captured-image" alt="Captured photo" />
+                </div>
+            </div>
+            <div class="camera-controls">
+                <button id="take-photo-btn" class="btn primary"><i class="fas fa-camera"></i> Take Photo</button>
+                <button id="retake-photo-btn" class="btn secondary" style="display:none;"><i class="fas fa-redo"></i>
+                    Retake</button>
+                <button id="send-photo-btn" class="btn success" style="display:none;"><i class="fas fa-paper-plane"></i>
+                    Send to AI</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Meeting Layout -->
+    <div class="meeting-layout" id="meeting-layout">
+        <!-- Screen sharing video will float in the top-right corner -->
+        <div class="screen-preview-floater" id="screen-preview-floater" style="display: none;">
+            <video id="screen-video" autoplay muted></video>
+        </div>
+
+        <div class="meeting-left-panel">
+            <div class="panel transcription-panel">
+                <h2>
+                    <span>Transcription Result</span>
+                    <i class="fas fa-copy" id="copy-transcription" title="Copy to clipboard"></i>
+                </h2>
+                <div class="panel-content" id="transcription-result"></div>
+            </div>
+
+            <div class="image-analysis-section meeting-only-section">
+                <h2>Image Analysis <span>(Upload up to 7 images)</span></h2>
+
+                <div class="image-upload-container">
+                    <div class="upload-instructions">
+                        Paste images directly or drag and drop them here.
+                        We'll analyze the content and provide detailed answers.
+                    </div>
+
+                    <div class="paste-area" id="paste-area">
+                        <i class="fas fa-paste"></i> Click here to paste images from clipboard or drop images here
+                    </div>
+
+                    <div class="image-preview-container" id="image-preview-container"></div>
+
+                    <button id="analyze-images-btn" class="btn primary" disabled>
+                        <i class="fas fa-search"></i> Analyze Images
+                    </button>
+                </div>
+            </div>
+        </div>
+
+        <div class="meeting-right-panel">
+            <div class="panel ai-response-panel">
+                <h2>
+                    <span>AI Response</span>
+                    <i class="fas fa-copy" id="copy-response" title="Copy to clipboard"></i>
+                </h2>
+                <div class="ai-status" id="ai-status" style="display: none;"></div>
+                <div class="panel-content" id="ai-response"></div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Help Modal -->
+    <div id="help-modal" class="modal">
+        <div class="modal-content">
+            <span class="close-button" id="close-help">&times;</span>
+            <h2>Voice-to-Text App Help</h2>
+            <div class="help-content">
+                <h3>Getting Started</h3>
+                <p>Click "Start Recording" to begin voice recognition. Speak clearly into your microphone. The
+                    transcribed text will appear in real-time in the transcription panel.</p>
+
+                <h3>Controls</h3>
+                <ul>
+                    <li><strong>Start Recording:</strong> Begin capturing audio from your microphone</li>
+                    <li><strong>Stop Recording:</strong> End the current recording session</li>
+                    <li><strong>Clear Transcription:</strong> Remove all transcribed text</li>
+                    <li><strong>Share Screen:</strong> Share your screen during recording</li>
+                </ul>
+
+                <h3>Image Analysis</h3>
+                <ul>
+                    <li>Paste up to 7 images for AI analysis</li>
+                    <li>Get detailed explanations including approach, code examples, and complexity analysis</li>
+                    <li>Perfect for technical interviews or code reviews</li>
+                </ul>
+
+                <h3>Tips for Best Results</h3>
+                <ul>
+                    <li>Use a good quality microphone in a quiet environment</li>
+                    <li>Speak clearly and at a moderate pace</li>
+                    <li>For screen sharing, ensure your screen has content visible that you want to discuss</li>
+                </ul>
+            </div>
+            <div class="form-group buttons">
+                <button id="close-help-btn" class="btn primary">Got it!</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Settings Modal -->
+    <div id="settings-modal" class="modal">
+        <div class="modal-content">
+            <span class="close-button" id="close-settings">&times;</span>
+            <h2>Voice Recognition Settings</h2>
+            <div class="form-group">
+                <label for="language">Recognition Language</label>
+                <select id="language">
+                    <option value="en-US">English (US)</option>
+                    <option value="en-GB">English (UK)</option>
+                    <option value="es-ES">Spanish</option>
+                    <option value="fr-FR">French</option>
+                    <option value="de-DE">German</option>
+                    <option value="zh-CN">Chinese (Simplified)</option>
+                    <option value="ja-JP">Japanese</option>
+                </select>
+            </div>
+            <div class="form-group">
+                <label for="continuous">
+                    <input type="checkbox" id="continuous" checked>
+                    Continuous Recognition
+                </label>
+            </div>
+            <div class="form-group">
+                <label for="interim-results">
+                    <input type="checkbox" id="interim-results" checked>
+                    Show Interim Results
+                </label>
+            </div>
+            <div class="form-group">
+                <label for="saveTranscriptions">
+                    <input type="checkbox" id="saveTranscriptions" checked>
+                    Save Transcription History
+                </label>
+            </div>
+            <div class="form-group">
+                <label for="timeout">Recognition Timeout (seconds)</label>
+                <input type="number" id="timeout" min="5" max="60" value="10">
+            </div>
+            <div class="form-group">
+                <label for="energyThreshold">Energy Threshold</label>
+                <input type="range" id="energyThreshold" min="100" max="1000" value="300">
+                <span id="energyThresholdValue">300</span>
+            </div>
+            <div class="form-group">
+                <label for="useVoiceCloning">
+                    <input type="checkbox" id="useVoiceCloning">
+                    Enable Voice Cloning
+                </label>
+            </div>
+            <div class="form-group">
+                <label for="aiModel">AI Model</label>
+                <select id="aiModel">
+                    <option value="gpt-4o">GPT-4o</option>
+                    <option value="gpt-4o-mini">GPT-4o Mini</option>
+                    <option value="gpt-4.1">GPT-4.1</option>
+                    <option value="gpt-4.1-mini">GPT-4.1 Mini</option>
+                </select>
+            </div>
+            <div class="form-group buttons">
+                <button id="settings-cancel" class="btn secondary">Cancel</button>
+                <button id="settings-save" class="btn primary">Save Settings</button>
+            </div>
+        </div>
+    </div>
+
+    <script src="https://js.puter.com/v2/"></script>
+    <script src="script.js"></script>
+</body>
+
+</html>
